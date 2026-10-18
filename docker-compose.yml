@@ -7,10 +7,10 @@ services:
     container_name: resumeiq_app
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
       - APP_NAME=ResumeIQ ATS Analyzer
       - DEBUG=false
       - MAX_UPLOAD_SIZE_BYTES=10485760
-      # Optional: Add your Gemini API key here if utilizing Layer B
-      # - GEMINI_API_KEY=your_key_here
     restart: unless-stopped

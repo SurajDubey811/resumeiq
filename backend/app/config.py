@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "ResumeIQ ATS Analyzer"
     app_version: str = "1.0.0"
-    debug: bool = False
+    debug: bool | str = False
     
     # Upload limits & constraints
     max_upload_size_bytes: int = 10 * 1024 * 1024  # 10 MB
@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     ai_request_timeout_seconds: int = 30
     
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env", "../.env"),
         env_file_encoding="utf-8",
         extra="ignore"
     )
