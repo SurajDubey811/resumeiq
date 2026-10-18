@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { ImprovementSuggestion, ExtractedSection } from '../types';
-import { improveResume } from '../services/api';
-import { Check, X, Sparkles, RefreshCw, Copy, CheckCheck, ShieldCheck, Cpu } from 'lucide-react';
+import { improveResume, exportResumeDocument } from '../services/api';
+import { Check, X, Sparkles, RefreshCw, Copy, CheckCheck, ShieldCheck, Cpu, Download, FileText } from 'lucide-react';
 
 interface ResumeImprovementStudioProps {
   resumeText: string;
   jobDescription?: string;
   sections?: ExtractedSection[];
+  filename?: string;
+  fileType?: string;
   onBack: () => void;
 }
 
@@ -14,10 +16,13 @@ export const ResumeImprovementStudio: React.FC<ResumeImprovementStudioProps> = (
   resumeText,
   jobDescription,
   sections,
+  filename,
+  fileType = 'pdf',
   onBack,
 }) => {
   const [useAI, setUseAI] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [suggestions, setSuggestions] = useState<ImprovementSuggestion[]>([]);
   const [disclaimer, setDisclaimer] = useState<string>('');
   const [copied, setCopied] = useState(false);
@@ -61,6 +66,37 @@ export const ResumeImprovementStudio: React.FC<ResumeImprovementStudioProps> = (
     navigator.clipboard.writeText(getCompiledResume());
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownloadFormatted = async (targetFormat?: 'pdf' | 'docx') => {
+    setDownloading(true);
+    try {
+      const acceptedList = suggestions
+        .filter((s) => s.status === 'accepted')
+        .map((s) => ({ original_text: s.original_text, suggested_text: s.suggested_text }));
+
+      const effectiveFormat = targetFormat || (fileType.toLowerCase().includes('docx') ? 'docx' : 'pdf');
+      const { blob, downloadName } = await exportResumeDocument(
+        resumeText,
+        fileType,
+        acceptedList,
+        filename || 'resume',
+        effectiveFormat
+      );
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = downloadName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(err.message || 'Failed to download updated resume.');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const acceptedCount = suggestions.filter((s) => s.status === 'accepted').length;
@@ -235,21 +271,66 @@ export const ResumeImprovementStudio: React.FC<ResumeImprovementStudioProps> = (
 
       {/* Compiled Export Bar */}
       {!loading && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div>
-            <h4 className="text-sm font-bold text-white">Export Updated Resume</h4>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Copy the revised text with your {acceptedCount} accepted improvement(s) incorporated.
+            <div className="flex items-center gap-2">
+              <h4 className="text-sm font-bold text-white">Download Updated Resume</h4>
+              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                Original Format: {fileType.toUpperCase()}
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-1 max-w-xl">
+              Export your resume with your {acceptedCount} accepted improvement(s) incorporated directly into a cleanly formatted, ATS-compliant {fileType.toUpperCase()} document.
             </p>
           </div>
 
-          <button
-            onClick={handleCopyCompiled}
-            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-2 transition shadow-md shadow-indigo-600/20"
-          >
-            {copied ? <CheckCheck className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
-            <span>{copied ? 'Copied to Clipboard!' : 'Copy Revised Resume Text'}</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Primary Download Button: In Original Format */}
+            <button
+              onClick={() => handleDownloadFormatted(fileType.toLowerCase().includes('docx') ? 'docx' : 'pdf')}
+              disabled={downloading}
+              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-2 transition shadow-md shadow-emerald-600/20 disabled:opacity-50"
+            >
+              <Download className="w-4 h-4" />
+              <span>
+                {downloading
+                  ? 'Generating Document...'
+                  : `Download Updated ${fileType.toLowerCase().includes('docx') ? 'Word (.docx)' : 'PDF (.pdf)'}`}
+              </span>
+            </button>
+
+            {/* Alternate Format Button */}
+            {fileType.toLowerCase().includes('docx') ? (
+              <button
+                onClick={() => handleDownloadFormatted('pdf')}
+                disabled={downloading}
+                className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition flex items-center gap-1.5"
+                title="Download as ATS-compliant PDF"
+              >
+                <FileText className="w-3.5 h-3.5 text-purple-400" />
+                <span>As PDF</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => handleDownloadFormatted('docx')}
+                disabled={downloading}
+                className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition flex items-center gap-1.5"
+                title="Download as editable Word (.docx) document"
+              >
+                <FileText className="w-3.5 h-3.5 text-blue-400" />
+                <span>As DOCX</span>
+              </button>
+            )}
+
+            {/* Copy Text Button */}
+            <button
+              onClick={handleCopyCompiled}
+              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition flex items-center gap-1.5"
+            >
+              {copied ? <CheckCheck className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
+              <span>{copied ? 'Copied!' : 'Copy Plain Text'}</span>
+            </button>
+          </div>
         </div>
       )}
     </div>

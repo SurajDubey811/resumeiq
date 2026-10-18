@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, status
+from fastapi import APIRouter, UploadFile, File, HTTPException, status, Response
 from app.config import settings
 from app.models.schemas import (
     HealthResponse,
@@ -8,6 +8,7 @@ from app.models.schemas import (
     ParsedResume,
     ImproveRequest,
     ImproveResponse,
+    ExportRequest,
 )
 from app.parser.extractor import (
     parse_resume_bytes,
@@ -187,4 +188,46 @@ async def improve_resume(request: ImproveRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate resume improvements: {str(e)}"
         )
+
+
+@router.post("/resumes/export")
+async def export_resume_document(request: ExportRequest):
+    """
+    Exports the updated resume with accepted changes incorporated.
+    Returns binary PDF or DOCX file with appropriate Content-Disposition header.
+    """
+    if not request.resume_text or not request.resume_text.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Resume text cannot be empty."
+        )
+
+    try:
+        from app.generator.exporter import export_resume
+        changes_dicts = [
+            {"original_text": c.original_text, "suggested_text": c.suggested_text}
+            for c in request.accepted_changes
+        ]
+        file_bytes, media_type, download_name = export_resume(
+            original_text=request.resume_text,
+            file_type=request.file_type,
+            accepted_changes=changes_dicts,
+            filename=request.filename,
+            target_format=request.target_format
+        )
+        return Response(
+            content=file_bytes,
+            media_type=media_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{download_name}"',
+                "Access-Control-Expose-Headers": "Content-Disposition"
+            }
+        )
+    except Exception as e:
+        logger.error(f"Resume export error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate resume export: {str(e)}"
+        )
+
 

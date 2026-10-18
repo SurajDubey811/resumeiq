@@ -158,3 +158,17 @@ class ImproveResponse(BaseModel):
     ai_used: bool = False
     disclaimer: str = ""
     error: Optional[str] = None
+
+
+class AcceptedChange(BaseModel):
+    original_text: str
+    suggested_text: str
+
+
+class ExportRequest(BaseModel):
+    resume_text: str
+    file_type: str = "pdf"  # "pdf" or "docx"
+    filename: Optional[str] = "resume"
+    target_format: Optional[str] = None  # "pdf" or "docx"
+    accepted_changes: List[AcceptedChange] = Field(default_factory=list)
+

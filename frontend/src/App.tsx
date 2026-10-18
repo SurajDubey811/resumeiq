@@ -542,6 +542,8 @@ export const App: React.FC = () => {
             resumeText={resumeText}
             jobDescription={isResumeOnly ? undefined : jobDescription}
             sections={parsedResume?.sections}
+            filename={parsedResume?.filename || (file ? file.name : 'resume.pdf')}
+            fileType={parsedResume?.file_type || (file?.name.endsWith('.docx') ? 'docx' : 'pdf')}
             onBack={() => setView('results')}
           />
         )}

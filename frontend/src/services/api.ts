@@ -92,3 +92,39 @@ export async function checkHealth(): Promise<boolean> {
     return false;
   }
 }
+
+export async function exportResumeDocument(
+  resumeText: string,
+  fileType: string = 'pdf',
+  acceptedChanges: { original_text: string; suggested_text: string }[],
+  filename?: string,
+  targetFormat?: string
+): Promise<{ blob: Blob; downloadName: string }> {
+  const res = await fetch(`${API_BASE}/resumes/export`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      resume_text: resumeText,
+      file_type: fileType,
+      filename: filename || 'resume',
+      target_format: targetFormat || null,
+      accepted_changes: acceptedChanges,
+    }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ detail: 'Failed to export resume document.' }));
+    throw new Error(errorData.detail || `Export failed with status ${res.status}`);
+  }
+
+  const blob = await res.blob();
+  const disposition = res.headers.get('Content-Disposition') || '';
+  let downloadName = `${(filename || 'resume').replace(/\.(pdf|docx)$/i, '')}_ATS_Optimized.${targetFormat || fileType || 'pdf'}`;
+  const match = disposition.match(/filename="?([^";]+)"?/i);
+  if (match && match[1]) {
+    downloadName = match[1];
+  }
+
+  return { blob, downloadName };
+}
+
