@@ -103,8 +103,22 @@ def match_section_header(line: str) -> Optional[str]:
     return None
 
 
+def is_header_or_date_line(line: str) -> bool:
+    """Detects if a line is a company name, job title, date range, or metadata rather than a bullet."""
+    # Date range patterns: 2020 - Present, Apr 2025 – Present, (2021 - 2023)
+    if re.search(r'\b(19\d{2}|20\d{2})\s*(?:-|–|—|to)\s*(?:19\d{2}|20\d{2}|present|current)\b', line, re.IGNORECASE):
+        return True
+    # Multiple pipes often indicate Company | Location | Role
+    if line.count('|') >= 1 and ('engineer' in line.lower() or 'developer' in line.lower() or 'lead' in line.lower() or 'sdet' in line.lower() or 'remote' in line.lower()):
+        return True
+    # Common header indicators
+    if re.match(r'^[A-Z][a-zA-Z0-9\s,\.]+\s*\|\s*', line):
+        return True
+    return False
+
+
 def extract_bullet_points(content: str) -> List[str]:
-    """Extracts bullet points or distinct list items from a section's text."""
+    """Extracts genuine accomplishment bullet points from a section's text."""
     lines = content.splitlines()
     bullets: List[str] = []
     current_bullet: List[str] = []
@@ -115,30 +129,43 @@ def extract_bullet_points(content: str) -> List[str]:
         line = raw_line.strip()
         if not line:
             if current_bullet:
-                bullets.append(" ".join(current_bullet).strip())
+                bullet_str = " ".join(current_bullet).strip()
+                if not is_header_or_date_line(bullet_str) and len(bullet_str) > 15:
+                    bullets.append(bullet_str)
+                current_bullet = []
+            continue
+
+        if is_header_or_date_line(line) and not bullet_char_pattern.match(raw_line):
+            # Skip job titles / company header lines
+            if current_bullet:
+                bullet_str = " ".join(current_bullet).strip()
+                if not is_header_or_date_line(bullet_str) and len(bullet_str) > 15:
+                    bullets.append(bullet_str)
                 current_bullet = []
             continue
 
         match = bullet_char_pattern.match(raw_line)
         if match:
             if current_bullet:
-                bullets.append(" ".join(current_bullet).strip())
+                bullet_str = " ".join(current_bullet).strip()
+                if not is_header_or_date_line(bullet_str) and len(bullet_str) > 15:
+                    bullets.append(bullet_str)
             current_bullet = [match.group(1).strip()]
         else:
             if current_bullet:
                 # Continuation of current bullet point
                 current_bullet.append(line)
             else:
-                # Regular line; if it looks like a distinct achievement sentence, include it
-                if len(line) > 20 and (line.endswith('.') or line.endswith(';')):
+                # Regular line; only include if it looks like an accomplishment sentence
+                if len(line) > 25 and (line.endswith('.') or line.endswith(';')) and not is_header_or_date_line(line):
                     bullets.append(line)
-                elif not current_bullet and len(line) > 15:
-                    current_bullet.append(line)
 
     if current_bullet:
-        bullets.append(" ".join(current_bullet).strip())
+        bullet_str = " ".join(current_bullet).strip()
+        if not is_header_or_date_line(bullet_str) and len(bullet_str) > 15:
+            bullets.append(bullet_str)
 
-    return [b for b in bullets if len(b) > 5]
+    return [b for b in bullets if len(b) > 10 and not is_header_or_date_line(b)]
 
 
 def parse_sections(raw_text: str) -> List[ExtractedSection]:
