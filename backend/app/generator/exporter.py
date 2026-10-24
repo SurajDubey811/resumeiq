@@ -261,3 +261,4 @@ def export_resume(
         download_name = f"{clean_base}_ATS_Optimized.pdf"
 
     return data, media_type, download_name
+

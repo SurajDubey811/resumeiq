@@ -71,3 +71,4 @@ def test_export_docx_with_accepted_changes():
     assert "Jane Doe" in full_text
     assert "Spearheaded PostgreSQL database query optimization" in full_text
     assert "reducing latency by 40%" in full_text
+
